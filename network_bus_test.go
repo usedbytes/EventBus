@@ -76,7 +76,7 @@ func TestServerPublish(t *testing.T) {
 	clientBus := NewClient(":2025", "/_client_bus_b", New())
 	clientBus.Start()
 
-	clientBus.Subscribe("topic", fn, ":2010", "/_server_bus_b")
+	clientBus.SubscribeRemote("topic", fn, ":2010", "/_server_bus_b")
 
 	serverBus.EventBus().Publish("topic", 10)
 
@@ -96,7 +96,7 @@ func TestNetworkBus(t *testing.T) {
 			t.Fail()
 		}
 	}
-	networkBusA.Subscribe("topic-A", fnA, ":2030", "/_net_bus_B")
+	networkBusA.SubscribeRemote("topic-A", fnA, ":2030", "/_net_bus_B")
 	networkBusB.EventBus().Publish("topic-A", 10)
 
 	fnB := func(a int) {
@@ -104,7 +104,7 @@ func TestNetworkBus(t *testing.T) {
 			t.Fail()
 		}
 	}
-	networkBusB.Subscribe("topic-B", fnB, ":2035", "/_net_bus_A")
+	networkBusB.SubscribeRemote("topic-B", fnB, ":2035", "/_net_bus_A")
 	networkBusA.EventBus().Publish("topic-B", 20)
 
 	networkBusA.Stop()

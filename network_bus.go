@@ -12,10 +12,11 @@ import (
 // NetworkBus - object capable of subscribing to remote event buses in addition to remote event
 // busses subscribing to it's local event bus. Compoed of a server and cliet
 type NetworkBus struct {
+	Bus
 	*Client
 	*Server
 	service   *NetworkBusService
-	sharedBus Bus
+	remoteBus Bus
 	address   string
 	path      string
 }
@@ -23,9 +24,10 @@ type NetworkBus struct {
 // NewNetworkBus - returns a new network bus object at the server address and path
 func NewNetworkBus(address, path string) *NetworkBus {
 	bus := new(NetworkBus)
-	bus.sharedBus = New()
-	bus.Server = NewServer(address, path, bus.sharedBus)
-	bus.Client = NewClient(address, path, bus.sharedBus)
+	bus.remoteBus = New()
+	bus.Bus = New()
+	bus.Server = NewServer(address, path, bus.remoteBus)
+	bus.Client = NewClient(address, path, bus.Bus)
 	bus.service = &NetworkBusService{&sync.WaitGroup{}, false}
 	bus.address = address
 	bus.path = path
@@ -34,7 +36,7 @@ func NewNetworkBus(address, path string) *NetworkBus {
 
 // EventBus - returns wrapped event bus
 func (networkBus *NetworkBus) EventBus() Bus {
-	return networkBus.sharedBus
+	return Bus(networkBus)
 }
 
 // NetworkBusService - object capable of serving the network bus
@@ -73,4 +75,13 @@ func (networkBus *NetworkBus) Stop() {
 		service.wg.Done()
 		service.started = false
 	}
+}
+
+func (networkBus *NetworkBus) Publish(topic string, args ...interface{}) {
+	networkBus.Bus.Publish(topic, args...)
+	networkBus.remoteBus.Publish(topic, args...)
+}
+
+func (networkBus *NetworkBus) HasCallback(topic string) bool {
+	return networkBus.Bus.HasCallback(topic) || networkBus.remoteBus.HasCallback(topic)
 }
