@@ -61,9 +61,6 @@ func (client *Client) doSubscribe(topic string, fn interface{}, serverAddr, serv
 	if err != nil {
 		fmt.Errorf("Register error: %v", err)
 	}
-	if *reply {
-		client.eventBus.Subscribe(topic, fn)
-	}
 }
 
 //Subscribe subscribes to a topic in a remote event bus
