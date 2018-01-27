@@ -33,12 +33,20 @@ type SubscribeArg struct {
 	Topic         string
 }
 
+type ClientAddress struct {
+	addr, path string
+}
+
+type Subscriber struct {
+	topics map[string]*SubscribeArg
+}
+
 // Server - object capable of being subscribed to by remote handlers
 type Server struct {
 	eventBus    Bus
 	address     string
 	path        string
-	subscribers map[string][]*SubscribeArg
+	subscribers map[ClientAddress]*Subscriber
 	service     *ServerService
 }
 
@@ -48,7 +56,7 @@ func NewServer(address, path string, eventBus Bus) *Server {
 	server.eventBus = eventBus
 	server.address = address
 	server.path = path
-	server.subscribers = make(map[string][]*SubscribeArg)
+	server.subscribers = make(map[ClientAddress]*Subscriber)
 	server.service = &ServerService{server, &sync.WaitGroup{}, false}
 	return server
 }
@@ -78,13 +86,13 @@ func (server *Server) rpcCallback(subscribeArg *SubscribeArg) func(args ...inter
 
 // HasClientSubscribed - True if a client subscribed to this server with the same topic
 func (server *Server) HasClientSubscribed(arg *SubscribeArg) bool {
-	if topicSubscribers, ok := server.subscribers[arg.Topic]; ok {
-		for _, topicSubscriber := range topicSubscribers {
-			if *topicSubscriber == *arg {
-				return true
-			}
-		}
+	client := ClientAddress{arg.ClientAddr, arg.ClientPath}
+
+	if sub, ok := server.subscribers[client]; ok {
+		_, ok := sub.topics[arg.Topic]
+		return ok
 	}
+
 	return false
 }
 
@@ -130,24 +138,30 @@ type ServerService struct {
 // for a remote subscribe - a given client address only needs to subscribe once
 // event will be republished in local event bus
 func (service *ServerService) Register(arg *SubscribeArg, success *bool) error {
+	var sub *Subscriber
+	var ok bool
+
 	subscribers := service.server.subscribers
-	if !service.server.HasClientSubscribed(arg) {
+	client := ClientAddress{arg.ClientAddr, arg.ClientPath}
+
+	if sub, ok = subscribers[client]; !ok {
+		sub = &Subscriber{
+			topics: make(map[string]*SubscribeArg),
+		}
+		subscribers[client] = sub
+	}
+
+	if _, ok := sub.topics[arg.Topic]; !ok {
 		rpcCallback := service.server.rpcCallback(arg)
+		sub.topics[arg.Topic] = arg
 		switch arg.SubscribeType {
 		case Subscribe:
 			service.server.eventBus.Subscribe(arg.Topic, rpcCallback)
 		case SubscribeOnce:
 			service.server.eventBus.SubscribeOnce(arg.Topic, rpcCallback)
 		}
-		var topicSubscribers []*SubscribeArg
-		if _, ok := subscribers[arg.Topic]; ok {
-			topicSubscribers = []*SubscribeArg{arg}
-		} else {
-			topicSubscribers = subscribers[arg.Topic]
-			topicSubscribers = append(topicSubscribers, arg)
-		}
-		subscribers[arg.Topic] = topicSubscribers
 	}
+
 	*success = true
 	return nil
 }
