@@ -43,7 +43,7 @@ func (client *Client) EventBus() Bus {
 	return client.eventBus
 }
 
-func (client *Client) doSubscribe(topic string, fn interface{}, serverAddr, serverPath string, subscribeType SubscribeType) {
+func (client *Client) doSubscribe(topic string, fn interface{}, serverAddr, serverPath string, subscribeType SubscribeType, remoteOnly bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Server not found -", r)
@@ -61,19 +61,23 @@ func (client *Client) doSubscribe(topic string, fn interface{}, serverAddr, serv
 	if err != nil {
 		fmt.Errorf("Register error: %v", err)
 	}
-	if *reply {
+	if *reply && !remoteOnly {
 		client.eventBus.Subscribe(topic, fn)
 	}
 }
 
 //Subscribe subscribes to a topic in a remote event bus
 func (client *Client) SubscribeRemote(topic string, fn interface{}, serverAddr, serverPath string) {
-	client.doSubscribe(topic, fn, serverAddr, serverPath, Subscribe)
+	client.doSubscribe(topic, fn, serverAddr, serverPath, Subscribe, false)
+}
+
+func (client *Client) SubscribeRemoteOnly(topic string, fn interface{}, serverAddr, serverPath string) {
+	client.doSubscribe(topic, fn, serverAddr, serverPath, Subscribe, true)
 }
 
 //SubscribeOnce subscribes once to a topic in a remote event bus
 func (client *Client) SubscribeOnceRemote(topic string, fn interface{}, serverAddr, serverPath string) {
-	client.doSubscribe(topic, fn, serverAddr, serverPath, SubscribeOnce)
+	client.doSubscribe(topic, fn, serverAddr, serverPath, SubscribeOnce, false)
 }
 
 // Start - starts the client service to listen to remote events
