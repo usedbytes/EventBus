@@ -38,6 +38,7 @@ type ClientAddress struct {
 }
 
 type Subscriber struct {
+	client *rpc.Client
 	topics map[string]*SubscribeArg
 }
 
@@ -66,18 +67,23 @@ func (server *Server) EventBus() Bus {
 	return server.eventBus
 }
 
-func (server *Server) rpcCallback(subscribeArg *SubscribeArg) func(args ...interface{}) {
+func (server *Server) rpcCallback(sub *Subscriber, subscribeArg *SubscribeArg) func(args ...interface{}) {
 	return func(args ...interface{}) {
-		client, connErr := rpc.DialHTTPPath("tcp", subscribeArg.ClientAddr, subscribeArg.ClientPath)
-		defer client.Close()
-		if connErr != nil {
-			fmt.Errorf("dialing: %v", connErr)
+		if sub.client == nil {
+			client, err := rpc.DialHTTPPath("tcp", subscribeArg.ClientAddr, subscribeArg.ClientPath)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			sub.client = client
 		}
+
 		clientArg := new(ClientArg)
 		clientArg.Topic = subscribeArg.Topic
 		clientArg.Args = args
 		var reply bool
-		err := client.Call(subscribeArg.ServiceMethod, clientArg, &reply)
+		err := sub.client.Call(subscribeArg.ServiceMethod, clientArg, &reply)
 		if err != nil {
 			fmt.Errorf("dialing: %v", err)
 		}
@@ -152,7 +158,7 @@ func (service *ServerService) Register(arg *SubscribeArg, success *bool) error {
 	}
 
 	if _, ok := sub.topics[arg.Topic]; !ok {
-		rpcCallback := service.server.rpcCallback(arg)
+		rpcCallback := service.server.rpcCallback(sub, arg)
 		sub.topics[arg.Topic] = arg
 		switch arg.SubscribeType {
 		case Subscribe:
