@@ -85,7 +85,7 @@ func (server *Server) rpcCallback(sub *Subscriber, subscribeArg *SubscribeArg) f
 		var reply bool
 		err := sub.client.Call(subscribeArg.ServiceMethod, clientArg, &reply)
 		if err != nil {
-			fmt.Errorf("dialing: %v", err)
+			fmt.Println("dialing: %v", err)
 		}
 	}
 }
